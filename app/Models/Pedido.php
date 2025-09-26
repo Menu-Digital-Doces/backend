@@ -7,5 +7,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pedido extends Model
 {
-    use HasFactory;
+    protected $fillable = [
+        'codigo',
+        'user_id',
+        'produto_id',
+        'total',
+        'quantidade',
+        'status',
+    ];
+
+    protected $casts = [
+        'total' => 'decimal:2',
+    ];
+
+    public function user()
+    {
+        return $this->bellongsTo(User::class);
+    }
+
+    public function itens()
+    {
+        return $this->belongsTo(Produto::class);
+    }
 }
