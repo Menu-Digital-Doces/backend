@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('pedidos', function (Blueprint $table) {
             $table->id();
+            $table->integer('codigo')->unique();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('produto_id')->constrained()->cascadeOnDelete();
+            $table->decimal('total', 12, 2)->default(0);
+            $table->integer('quantidade')->default(1);
+            $table->enum('status', ['Pendente', 'Confirmado', 'Cancelado'])->nullable()->default('Pendente');
             $table->timestamps();
         });
     }
