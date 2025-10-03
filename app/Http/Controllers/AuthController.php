@@ -8,15 +8,19 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    public function register(Request $request) {
+    public function register(Request $request)
+    {
+
         $validate = $request->validate([
-            'nome' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6|confirmed',
         ]);
 
+
+
         $user = User::create([
-            'nome' => $validate['nome'],
+            'name' => $validate['name'],
             'email' => $validate['email'],
             'password' => bcrypt($validate['password']),
         ]);
@@ -24,22 +28,31 @@ class AuthController extends Controller
         return response()->json($user, 201);
     }
 
-    public function login(Request $request) {
+    public function login(Request $request)
+    {
         $credencial = $request->only('email', 'password');
 
-        if (!$token = Auth::attempt($credencial)) {
+        if (!$token = Auth::guard('api')->attempt($credencial)) {
             return response()->json(['error' => 'Não autorizado'], 401);
         }
 
-        return response()->json(['token' => $token, 'user' => Auth::user()]);
+        return response()->json([
+            'token' => $token,
+            'user' => Auth::guard('api')->user()
+        ]);
     }
 
-    public function logout(Request $request) {
-        Auth::logout();
+    public function logout(Request $request)
+    {
+        Auth::guard('api')->logout();
         return response()->json(['message' => 'Logout realizado com sucesso']);
     }
 
-    public function user() {
-        return response()->json(Auth::user());
+    public function user()
+    {
+        // dd('texto comum');
+        // exit();
+
+        return response()->json(Auth::guard('api')->user());
     }
 }
