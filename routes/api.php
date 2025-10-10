@@ -27,14 +27,16 @@ Route::get('produtos/{id}', [ProdutoController::class, 'show']);
 Route::put('produtos/{id}', [ProdutoController::class, 'update']);
 Route::delete('produtos/{id}', [ProdutoController::class, 'destroy']);
 
+Route::get('pedidos', [PedidoController::class, 'index']);
+Route::post('pedidos', [PedidoController::class, 'store']);
+Route::get('pedidos/{id}', [PedidoController::class, 'show']);
+Route::put('pedidos/{id}', [PedidoController::class, 'update']);
+Route::delete('pedidos/{id}', [PedidoController::class, 'destroy']);
+
 Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('user', [AuthController::class, 'user'])->name('user');
 
-    Route::get('pedidos', [PedidoController::class, 'index']);
-    Route::post('pedidos', [PedidoController::class, 'store']);
-    Route::get('pedidos/{id}', [PedidoController::class, 'show']);
-    Route::put('pedidos/{id}', [PedidoController::class, 'update']);
-    Route::delete('pedidos/{id}', [PedidoController::class, 'destroy']);
+
     // Route::apiResource('produtos', App\Http\Controllers\ProdutoController::class);
 });

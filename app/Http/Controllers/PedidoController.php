@@ -6,57 +6,81 @@ use Illuminate\Http\Request;
 use App\Models\Pedido;
 use App\Models\Produto;
 use Nette\Utils\Random;
+use Illuminate\Support\Facades\DB;
 
 class PedidoController extends Controller
 {
     public function index(Request $request)
     {
-        $pedidos = Pedido::with(['user', 'itens'])->get();
+        // $pedidos = Pedido::with(['user', 'itens'])->get();
+        $user = 3;
+        $pedidos = DB::table('pedidos')
+            ->join('users', 'pedidos.user_id', '=', 'users.id')
+            ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
+            ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id')
+            ->where('users.id', $user)
+            ->get();
+
         return response()->json($pedidos, 200);
     }
 
     public function store(Request $request)
     {
-        $validate = $request->validate([
-            'codigo' => 'required|string|max:255|unique:pedidos',
-            'user_id' => 'required|exists:users,id',
-            'produto_id' => 'required|exists:produtos,id',
-            'total' => 'required|numeric',
-            'quantidade' => 'required|integer',
-            'status' => 'required|in:Pendente,Processando,Concluído,Cancelado',
+        // Em uma aplicação real, o ID do usuário viria da autenticação
+        $user_id = 3;
+
+        // ALTERAÇÃO 1: Validar um array de itens
+        // A validação agora espera um campo 'itens' que seja um array.
+        // O '*' significa que cada elemento dentro do array 'itens' deve seguir a regra.
+        $validated = $request->validate([
+            'itens' => 'required|array|min:1',
+            'itens.*.produto_id' => 'required|exists:produtos,id',
+            'itens.*.quantidade' => 'required|integer|min:1',
         ]);
 
-        $pedido = Pedido::create([
-            'user_id' => auth()->id(),
-            'status' => 'Pendente',
-            'total' => 0
-        ]);
+        $codigo = Random::generate(10);
+        $pedidosCriados = []; // Array para guardar os pedidos criados
 
-        $total = 0;
-
-        foreach ($validate['itens'] as $item) {
+        // ALTERAÇÃO 2: Iterar sobre o array 'itens' validado
+        foreach ($validated['itens'] as $item) {
             $produto = Produto::find($item['produto_id']);
-            $valoUnitario = $produto->preco;
-            $subtotal = $valoUnitario * $item['quantidade'];
-            $total += $subtotal;
-            $pedido::create ([
-                'codigo' => Random::generate(10),
-                'product_id' => $produto->id,
-                'quantidade' => $item['quantidade'],
-                'total' => $total,
-            ]);
-        }
-        $pedido->update(['total' => $total]);
 
-        return response()->json($pedido->load('itens.produto'), 201);
+            // Se o produto não for encontrado, podemos pular ou retornar um erro.
+            if (!$produto) {
+                continue;
+            }
+
+            $pedido = new Pedido([
+                'codigo' => $codigo,
+                'user_id' => $user_id,
+                'produto_id' => $item['produto_id'],
+                'quantidade' => $item['quantidade'],
+                'total' => $produto->preco * $item['quantidade'],
+                'status' => 'Pendente',
+            ]);
+
+            // ALTERAÇÃO 3: Salvar a instância do pedido
+            $pedido->save();
+            $pedidosCriados[] = $pedido; // Adiciona o pedido salvo ao array
+        }
+
+        // ALTERAÇÃO 4: Retornar uma resposta mais útil
+        if (empty($pedidosCriados)) {
+            return response()->json(['message' => 'Nenhum item válido para criar o pedido.'], 400);
+        }
+
+        return response()->json($pedidosCriados, 201);
     }
 
     public function show($id) {
-        $pedido = Pedido::with('itens.produto')->find($id);
-        if (!$pedido) {
-            return response()->json(['message' => 'Pedido não encontrado'], 404);
-        }
-        return response()->json($pedido, 200);
+        $pedidos = DB::table('pedidos')
+            ->join('users', 'pedidos.user_id', '=', 'users.id')
+            ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
+            ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id')
+            ->where('pedidos.id', $id)
+            ->first();
+
+        return response()->json($pedidos, 200);
     }
 
     public function update(Request $request, $id)
