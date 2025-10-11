@@ -7,6 +7,7 @@ use App\Models\Pedido;
 use App\Models\Produto;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\Estoque;
 
 
 class PedidoController extends Controller
@@ -43,7 +44,17 @@ class PedidoController extends Controller
         DB::beginTransaction();
 
         try {
+
             foreach ($validated['itens'] as $item) {
+                $estoque = Estoque::where('produto_id', $item['produto_id'])->first();
+                if (!$estoque) {
+                    throw new \Exception("Estoque não encontrado para o produto.");
+                }
+
+                if ($estoque->quantidade < $item['quantidade']) {
+                    throw new \Exception("Estoque insuficiente para o produto.");
+                }
+
                 $produto = Produto::findOrFail($item['produto_id']);
 
                 // Verificar se produto está ativo
@@ -70,7 +81,15 @@ class PedidoController extends Controller
                 $produto->decrement('quantidade', $item['quantidade']);
 
                 $pedidosCriados[] = $pedido;
+
+                $estoqueInformacao = [
+                    'quantidade' => $estoque->quantidade - $pedido->quantidade,
+                ];
+
+                $estoque->update($estoqueInformacao);
             }
+
+
 
             DB::commit();
 

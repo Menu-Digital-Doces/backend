@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProdutoController;
 use App\Http\Controllers\PedidoController;
+use App\Http\Controllers\EstoqueController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +33,11 @@ Route::post('pedidos', [PedidoController::class, 'store']);
 Route::get('pedidos/{id}', [PedidoController::class, 'show']);
 Route::put('pedidos/{id}', [PedidoController::class, 'update']);
 Route::delete('pedidos/{id}', [PedidoController::class, 'destroy']);
+
+Route::get('estoques', [EstoqueController::class, 'index']);
+Route::get('estoques/{id}', [EstoqueController::class, 'show']);
+Route::put('estoques/{id}', [EstoqueController::class, 'update']);
+Route::delete('estoques/{id}', [EstoqueController::class, 'destroy']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');

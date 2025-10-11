@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Produto;
+use App\Models\Estoque;
 
 class ProdutoController extends Controller
 {
@@ -24,6 +25,14 @@ class ProdutoController extends Controller
         ]);
 
         $produto = Produto::create($validate);
+        // Atualiza estoque
+        $estoqueInformacao = [
+            'produto_id' => $produto->id,
+            'quantidade' => $validate['quantidade'],
+        ];
+        Estoque::create($estoqueInformacao);
+        $produto->quantidade = $validate['quantidade'];
+
         return response()->json($produto, 201);
     }
 
