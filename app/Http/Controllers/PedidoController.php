@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Pedido;
 use App\Models\Produto;
-use Nette\Utils\Random;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
 
 class PedidoController extends Controller
 {
@@ -26,53 +27,91 @@ class PedidoController extends Controller
 
     public function store(Request $request)
     {
-        // Em uma aplicação real, o ID do usuário viria da autenticação
-        $user_id = 3;
+        $user_id = 3; // TODO: Auth::id()
 
-        // ALTERAÇÃO 1: Validar um array de itens
-        // A validação agora espera um campo 'itens' que seja um array.
-        // O '*' significa que cada elemento dentro do array 'itens' deve seguir a regra.
         $validated = $request->validate([
             'itens' => 'required|array|min:1',
             'itens.*.produto_id' => 'required|exists:produtos,id',
             'itens.*.quantidade' => 'required|integer|min:1',
         ]);
 
-        $codigo = Random::generate(10);
-        $pedidosCriados = []; // Array para guardar os pedidos criados
+        // Gerar código único
+        $codigo = $this->gerarCodigoUnico();
+        $pedidosCriados = [];
 
-        // ALTERAÇÃO 2: Iterar sobre o array 'itens' validado
-        foreach ($validated['itens'] as $item) {
-            $produto = Produto::find($item['produto_id']);
+        // Usar transação para garantir atomicidade
+        DB::beginTransaction();
 
-            // Se o produto não for encontrado, podemos pular ou retornar um erro.
-            if (!$produto) {
-                continue;
+        try {
+            foreach ($validated['itens'] as $item) {
+                $produto = Produto::findOrFail($item['produto_id']);
+
+                // Verificar se produto está ativo
+                if ($produto->status !== 'Ativo') {
+                    throw new \Exception("Produto '{$produto->nome}' não está disponível.");
+                }
+
+                // Verificar estoque
+                if ($produto->quantidade < $item['quantidade']) {
+                    throw new \Exception("Estoque insuficiente para '{$produto->nome}'.");
+                }
+
+                // Criar pedido
+                $pedido = Pedido::create([
+                    'codigo' => $codigo,
+                    'user_id' => $user_id,
+                    'produto_id' => $item['produto_id'],
+                    'quantidade' => $item['quantidade'],
+                    'total' => $produto->preco * $item['quantidade'],
+                    'status' => 'Pendente',
+                ]);
+
+                // Atualizar estoque
+                $produto->decrement('quantidade', $item['quantidade']);
+
+                $pedidosCriados[] = $pedido;
             }
 
-            $pedido = new Pedido([
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Pedido criado com sucesso',
                 'codigo' => $codigo,
-                'user_id' => $user_id,
-                'produto_id' => $item['produto_id'],
-                'quantidade' => $item['quantidade'],
-                'total' => $produto->preco * $item['quantidade'],
-                'status' => 'Pendente',
-            ]);
-
-            // ALTERAÇÃO 3: Salvar a instância do pedido
-            $pedido->save();
-            $pedidosCriados[] = $pedido; // Adiciona o pedido salvo ao array
+                'itens' => $pedidosCriados,
+                'total_geral' => array_sum(array_map(fn($p) => $p->total, $pedidosCriados))
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Erro ao criar pedido',
+                'error' => $e->getMessage()
+            ], 400);
         }
-
-        // ALTERAÇÃO 4: Retornar uma resposta mais útil
-        if (empty($pedidosCriados)) {
-            return response()->json(['message' => 'Nenhum item válido para criar o pedido.'], 400);
-        }
-
-        return response()->json($pedidosCriados, 201);
     }
 
-    public function show($id) {
+    private function gerarCodigoUnico()
+    {
+        $tentativas = 0;
+        $maxTentativas = 10;
+
+        do {
+            // Formato: PED-20251010-A3F5E2
+            $codigo = 'PED-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+
+            $tentativas++;
+
+            if ($tentativas >= $maxTentativas) {
+                throw new \Exception('Não foi possível gerar um código único.');
+            }
+        } while (Pedido::where('codigo', $codigo)->exists());
+
+        return $codigo;
+    }
+
+
+
+    public function show($id)
+    {
         $pedidos = DB::table('pedidos')
             ->join('users', 'pedidos.user_id', '=', 'users.id')
             ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
@@ -91,7 +130,7 @@ class PedidoController extends Controller
         }
 
         $validate = $request->validate([
-            'status' => 'sometimes|required|in:Pendente,Processando,Concluído,Cancelado',
+            'status' => 'required|in:Pendente,Confirmado,Cancelado',
         ]);
 
         $pedido->update($validate);
