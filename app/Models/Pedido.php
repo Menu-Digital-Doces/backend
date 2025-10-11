@@ -22,7 +22,7 @@ class Pedido extends Model
 
     public function user()
     {
-        return $this->bellongsTo(User::class);
+        return $this->belongsTo(User::class);
     }
 
     public function itens()

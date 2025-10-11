@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Produto extends Model
 {
-    use softDeletes; // não exclui do banco, apenas marca a data de exclusão
+    use SoftDeletes; // não exclui do banco, apenas marca a data de exclusão
 
     protected $fillable = [
         'nome',
