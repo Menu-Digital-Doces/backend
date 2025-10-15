@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProdutoController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\EstoqueController;
+use App\Http\Controllers\PagamentoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,6 +39,8 @@ Route::get('estoques', [EstoqueController::class, 'index']);
 Route::get('estoques/{id}', [EstoqueController::class, 'show']);
 Route::put('estoques/{id}', [EstoqueController::class, 'update']);
 Route::delete('estoques/{id}', [EstoqueController::class, 'destroy']);
+
+Route::post('pedidos/{id}/pagamento', [PagamentoController::class, 'Pagar']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
