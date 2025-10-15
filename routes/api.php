@@ -22,29 +22,30 @@ use App\Http\Controllers\PagamentoController;
 Route::post('register', [AuthController::class, 'register'])->name('register');
 Route::post('login', [AuthController::class, 'login'])->name('login');
 
-// Rotas de produtos
-Route::get('produtos', [ProdutoController::class, 'index']);
-Route::post('produtos', [ProdutoController::class, 'store']);
-Route::get('produtos/{id}', [ProdutoController::class, 'show']);
-Route::put('produtos/{id}', [ProdutoController::class, 'update']);
-Route::delete('produtos/{id}', [ProdutoController::class, 'destroy']);
 
-Route::get('pedidos', [PedidoController::class, 'index']);
-Route::post('pedidos', [PedidoController::class, 'store']);
-Route::get('pedidos/{id}', [PedidoController::class, 'show']);
-Route::put('pedidos/{id}', [PedidoController::class, 'update']);
-Route::delete('pedidos/{id}', [PedidoController::class, 'destroy']);
-
-Route::get('estoques', [EstoqueController::class, 'index']);
-Route::get('estoques/{id}', [EstoqueController::class, 'show']);
-Route::put('estoques/{id}', [EstoqueController::class, 'update']);
-Route::delete('estoques/{id}', [EstoqueController::class, 'destroy']);
-
-Route::post('pedidos/{id}/pagamento', [PagamentoController::class, 'Pagar']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('user', [AuthController::class, 'user'])->name('user');
+
+    Route::get('produtos', [ProdutoController::class, 'index']);
+    Route::post('produtos', [ProdutoController::class, 'store']);
+    Route::get('produtos/{id}', [ProdutoController::class, 'show']);
+    Route::put('produtos/{id}', [ProdutoController::class, 'update']);
+    Route::delete('produtos/{id}', [ProdutoController::class, 'destroy']);
+
+    Route::get('pedidos', [PedidoController::class, 'index']);
+    Route::post('pedidos', [PedidoController::class, 'store']);
+    Route::get('pedidos/{id}', [PedidoController::class, 'show']);
+    Route::put('pedidos/{id}', [PedidoController::class, 'update']);
+    Route::delete('pedidos/{id}', [PedidoController::class, 'destroy']);
+
+    Route::get('estoques', [EstoqueController::class, 'index']);
+    Route::get('estoques/{id}', [EstoqueController::class, 'show']);
+    Route::put('estoques/{id}', [EstoqueController::class, 'update']);
+    Route::delete('estoques/{id}', [EstoqueController::class, 'destroy']);
+
+    Route::post('pedidos/{id}/pagamento', [PagamentoController::class, 'Pagar']);
 
 
     // Route::apiResource('produtos', App\Http\Controllers\ProdutoController::class);

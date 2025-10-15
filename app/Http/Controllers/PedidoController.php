@@ -8,6 +8,7 @@ use App\Models\Produto;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\Estoque;
+use Illuminate\Support\Facades\Auth;
 
 
 class PedidoController extends Controller
@@ -15,7 +16,7 @@ class PedidoController extends Controller
     public function index(Request $request)
     {
         // $pedidos = Pedido::with(['user', 'itens'])->get();
-        $user = 3;
+        $user = Auth::id();
         $pedidos = DB::table('pedidos')
             ->join('users', 'pedidos.user_id', '=', 'users.id')
             ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
@@ -28,7 +29,7 @@ class PedidoController extends Controller
 
     public function store(Request $request)
     {
-        $user_id = 3; // TODO: Auth::id()
+        $user_id = Auth::id();
 
         $validated = $request->validate([
             'itens' => 'required|array|min:1',
@@ -114,7 +115,6 @@ class PedidoController extends Controller
         $maxTentativas = 10;
 
         do {
-            // Formato: PED-20251010-A3F5E2
             $codigo = 'PED-' . date('Ymd') . '-' . strtoupper(Str::random(6));
 
             $tentativas++;
