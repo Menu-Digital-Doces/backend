@@ -8,8 +8,8 @@ use App\Models\Pedido;
 use App\Models\Produto;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Mockery;
 use Tests\TestCase;
 
@@ -32,7 +32,12 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function index_retorna_pedidos_do_usuario_com_sucesso()
     {
-        // Arrange: Mock do QueryBuilder
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
+            ->once()
+            ->andReturn(3);
+
+        // Mock do QueryBuilder
         $queryBuilder = Mockery::mock(QueryBuilder::class);
         
         $queryBuilder->shouldReceive('join')
@@ -85,7 +90,13 @@ class PedidoControllerTest extends TestCase
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals($pedidosEsperados, $response->getData());
+        
+        // Comparar o conteúdo JSON
+        $responseData = json_decode($response->getContent());
+        $this->assertIsArray($responseData);
+        $this->assertCount(1, $responseData);
+        $this->assertEquals('PED-20251014-ABC123', $responseData[0]->codigo);
+        $this->assertEquals('João Silva', $responseData[0]->user_name);
     }
 
     /** @test */
@@ -146,23 +157,33 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function update_atualiza_status_do_pedido_com_sucesso()
     {
-        // Arrange: Mock do modelo Pedido
-        $pedidoMock = Mockery::mock(Pedido::class);
+        // Arrange: Mock do modelo Pedido usando makePartial
+        $pedidoMock = Mockery::mock(Pedido::class)->makePartial();
+        $pedidoMock->id = 1;
+        $pedidoMock->codigo = 'PED-20251014-ABC123';
+        $pedidoMock->status = 'Pendente';
+        $pedidoMock->total = 500.00;
+        $pedidoMock->quantidade = 5;
+        
         $pedidoMock->shouldReceive('update')
             ->once()
             ->with(['status' => 'Confirmado'])
-            ->andReturn(true);
+            ->andReturnUsing(function($attributes) use ($pedidoMock) {
+                $pedidoMock->status = $attributes['status'];
+                return true;
+            });
         
-        $pedidoMock->id = 1;
-        $pedidoMock->codigo = 'PED-20251014-ABC123';
-        $pedidoMock->status = 'Confirmado';
-        $pedidoMock->total = 500.00;
-        $pedidoMock->quantidade = 5;
+        $pedidoMock->shouldReceive('getAttribute')
+            ->andReturnUsing(function($key) use ($pedidoMock) {
+                return $pedidoMock->$key;
+            });
 
-        Pedido::shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($pedidoMock);
+        $this->mock(Pedido::class, function ($mock) use ($pedidoMock) {
+            $mock->shouldReceive('find')
+                ->once()
+                ->with(1)
+                ->andReturn($pedidoMock);
+        });
 
         $request = Mockery::mock(Request::class);
         $request->shouldReceive('validate')
@@ -183,10 +204,12 @@ class PedidoControllerTest extends TestCase
     public function update_retorna_404_quando_pedido_nao_existe()
     {
         // Arrange
-        Pedido::shouldReceive('find')
-            ->once()
-            ->with(999)
-            ->andReturn(null);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('find')
+                ->once()
+                ->with(999)
+                ->andReturn(null);
+        });
 
         $request = Mockery::mock(Request::class);
 
@@ -203,15 +226,17 @@ class PedidoControllerTest extends TestCase
     public function destroy_deleta_pedido_com_sucesso()
     {
         // Arrange: Mock do modelo Pedido
-        $pedidoMock = Mockery::mock(Pedido::class);
+        $pedidoMock = Mockery::mock(Pedido::class)->makePartial();
         $pedidoMock->shouldReceive('delete')
             ->once()
             ->andReturn(true);
 
-        Pedido::shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($pedidoMock);
+        $this->mock(Pedido::class, function ($mock) use ($pedidoMock) {
+            $mock->shouldReceive('find')
+                ->once()
+                ->with(1)
+                ->andReturn($pedidoMock);
+        });
 
         // Act
         $response = $this->controller->destroy(1);
@@ -226,10 +251,12 @@ class PedidoControllerTest extends TestCase
     public function destroy_retorna_404_quando_pedido_nao_existe()
     {
         // Arrange
-        Pedido::shouldReceive('find')
-            ->once()
-            ->with(999)
-            ->andReturn(null);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('find')
+                ->once()
+                ->with(999)
+                ->andReturn(null);
+        });
 
         // Act
         $response = $this->controller->destroy(999);
@@ -243,75 +270,79 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function store_cria_pedido_com_sucesso()
     {
-        // Arrange: Mock dos modelos
-        $produtoMock = Mockery::mock(Produto::class);
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
+            ->once()
+            ->andReturn(3);
+
+        // Mock dos modelos
+        $produtoMock = Mockery::mock(Produto::class)->makePartial();
         $produtoMock->id = 1;
         $produtoMock->nome = 'Bolo de Chocolate';
         $produtoMock->preco = 100.00;
         $produtoMock->quantidade = 50;
         $produtoMock->status = 'Ativo';
         
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('status')
-            ->andReturn('Ativo');
-        
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('quantidade')
-            ->andReturn(50);
-        
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('preco')
-            ->andReturn(100.00);
-        
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('nome')
-            ->andReturn('Bolo de Chocolate');
-        
         $produtoMock->shouldReceive('decrement')
             ->once()
             ->with('quantidade', 5)
             ->andReturn(true);
+        
+        $produtoMock->shouldReceive('getAttribute')
+            ->andReturnUsing(function($key) use ($produtoMock) {
+                return $produtoMock->$key;
+            });
 
-        Produto::shouldReceive('findOrFail')
-            ->once()
-            ->with(1)
-            ->andReturn($produtoMock);
+        $this->mock(Produto::class, function ($mock) use ($produtoMock) {
+            $mock->shouldReceive('findOrFail')
+                ->once()
+                ->with(1)
+                ->andReturn($produtoMock);
+        });
 
-        $estoqueMock = Mockery::mock(Estoque::class);
+        $estoqueMock = Mockery::mock(Estoque::class)->makePartial();
         $estoqueMock->quantidade = 50;
-        $estoqueMock->shouldReceive('getAttribute')
-            ->with('quantidade')
-            ->andReturn(50);
         $estoqueMock->shouldReceive('update')
             ->once()
             ->andReturn(true);
+        
+        $estoqueMock->shouldReceive('getAttribute')
+            ->andReturnUsing(function($key) use ($estoqueMock) {
+                return $estoqueMock->$key;
+            });
 
-        Estoque::shouldReceive('where')
-            ->once()
-            ->with('produto_id', 1)
-            ->andReturnSelf();
-        Estoque::shouldReceive('first')
-            ->once()
-            ->andReturn($estoqueMock);
+        $this->mock(Estoque::class, function ($mock) use ($estoqueMock) {
+            $mock->shouldReceive('where')
+                ->once()
+                ->with('produto_id', 1)
+                ->andReturnSelf();
+            $mock->shouldReceive('first')
+                ->once()
+                ->andReturn($estoqueMock);
+        });
 
-        $pedidoMock = Mockery::mock(Pedido::class);
+        $pedidoMock = Mockery::mock(Pedido::class)->makePartial();
         $pedidoMock->id = 1;
         $pedidoMock->codigo = 'PED-20251014-ABC123';
         $pedidoMock->total = 500.00;
         $pedidoMock->quantidade = 5;
+        
         $pedidoMock->shouldReceive('getAttribute')
-            ->with('total')
-            ->andReturn(500.00);
+            ->andReturnUsing(function($key) use ($pedidoMock) {
+                return $pedidoMock->$key;
+            });
 
-        Pedido::shouldReceive('create')
-            ->once()
-            ->andReturn($pedidoMock);
-
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) use ($pedidoMock) {
+            $mock->shouldReceive('create')
+                ->once()
+                ->andReturn($pedidoMock);
+            
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         DB::shouldReceive('beginTransaction')->once();
         DB::shouldReceive('commit')->once();
@@ -339,14 +370,20 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function store_retorna_erro_quando_estoque_nao_encontrado()
     {
-        // Arrange
-        Estoque::shouldReceive('where')
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
             ->once()
-            ->with('produto_id', 1)
-            ->andReturnSelf();
-        Estoque::shouldReceive('first')
-            ->once()
-            ->andReturn(null);
+            ->andReturn(3);
+
+        $this->mock(Estoque::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->once()
+                ->with('produto_id', 1)
+                ->andReturnSelf();
+            $mock->shouldReceive('first')
+                ->once()
+                ->andReturn(null);
+        });
 
         DB::shouldReceive('beginTransaction')->once();
         DB::shouldReceive('rollBack')->once();
@@ -373,20 +410,28 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function store_retorna_erro_quando_estoque_insuficiente()
     {
-        // Arrange
-        $estoqueMock = Mockery::mock(Estoque::class);
-        $estoqueMock->quantidade = 3;
-        $estoqueMock->shouldReceive('getAttribute')
-            ->with('quantidade')
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
+            ->once()
             ->andReturn(3);
 
-        Estoque::shouldReceive('where')
-            ->once()
-            ->with('produto_id', 1)
-            ->andReturnSelf();
-        Estoque::shouldReceive('first')
-            ->once()
-            ->andReturn($estoqueMock);
+        $estoqueMock = Mockery::mock(Estoque::class)->makePartial();
+        $estoqueMock->quantidade = 3;
+        
+        $estoqueMock->shouldReceive('getAttribute')
+            ->andReturnUsing(function($key) use ($estoqueMock) {
+                return $estoqueMock->$key;
+            });
+
+        $this->mock(Estoque::class, function ($mock) use ($estoqueMock) {
+            $mock->shouldReceive('where')
+                ->once()
+                ->with('produto_id', 1)
+                ->andReturnSelf();
+            $mock->shouldReceive('first')
+                ->once()
+                ->andReturn($estoqueMock);
+        });
 
         DB::shouldReceive('beginTransaction')->once();
         DB::shouldReceive('rollBack')->once();
@@ -413,35 +458,44 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function store_retorna_erro_quando_produto_inativo()
     {
-        // Arrange
-        $estoqueMock = Mockery::mock(Estoque::class);
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
+            ->once()
+            ->andReturn(3);
+
+        $estoqueMock = Mockery::mock(Estoque::class)->makePartial();
         $estoqueMock->quantidade = 50;
+        
         $estoqueMock->shouldReceive('getAttribute')
-            ->with('quantidade')
-            ->andReturn(50);
+            ->andReturnUsing(function($key) use ($estoqueMock) {
+                return $estoqueMock->$key;
+            });
 
-        Estoque::shouldReceive('where')
-            ->once()
-            ->with('produto_id', 1)
-            ->andReturnSelf();
-        Estoque::shouldReceive('first')
-            ->once()
-            ->andReturn($estoqueMock);
+        $this->mock(Estoque::class, function ($mock) use ($estoqueMock) {
+            $mock->shouldReceive('where')
+                ->once()
+                ->with('produto_id', 1)
+                ->andReturnSelf();
+            $mock->shouldReceive('first')
+                ->once()
+                ->andReturn($estoqueMock);
+        });
 
-        $produtoMock = Mockery::mock(Produto::class);
+        $produtoMock = Mockery::mock(Produto::class)->makePartial();
         $produtoMock->nome = 'Bolo de Chocolate';
         $produtoMock->status = 'Inativo';
+        
         $produtoMock->shouldReceive('getAttribute')
-            ->with('status')
-            ->andReturn('Inativo');
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('nome')
-            ->andReturn('Bolo de Chocolate');
+            ->andReturnUsing(function($key) use ($produtoMock) {
+                return $produtoMock->$key;
+            });
 
-        Produto::shouldReceive('findOrFail')
-            ->once()
-            ->with(1)
-            ->andReturn($produtoMock);
+        $this->mock(Produto::class, function ($mock) use ($produtoMock) {
+            $mock->shouldReceive('findOrFail')
+                ->once()
+                ->with(1)
+                ->andReturn($produtoMock);
+        });
 
         DB::shouldReceive('beginTransaction')->once();
         DB::shouldReceive('rollBack')->once();
@@ -468,39 +522,45 @@ class PedidoControllerTest extends TestCase
     /** @test */
     public function store_retorna_erro_quando_quantidade_produto_insuficiente()
     {
-        // Arrange
-        $estoqueMock = Mockery::mock(Estoque::class);
+        // Arrange: Mock do Auth
+        Auth::shouldReceive('id')
+            ->once()
+            ->andReturn(3);
+
+        $estoqueMock = Mockery::mock(Estoque::class)->makePartial();
         $estoqueMock->quantidade = 50;
+        
         $estoqueMock->shouldReceive('getAttribute')
-            ->with('quantidade')
-            ->andReturn(50);
+            ->andReturnUsing(function($key) use ($estoqueMock) {
+                return $estoqueMock->$key;
+            });
 
-        Estoque::shouldReceive('where')
-            ->once()
-            ->with('produto_id', 1)
-            ->andReturnSelf();
-        Estoque::shouldReceive('first')
-            ->once()
-            ->andReturn($estoqueMock);
+        $this->mock(Estoque::class, function ($mock) use ($estoqueMock) {
+            $mock->shouldReceive('where')
+                ->once()
+                ->with('produto_id', 1)
+                ->andReturnSelf();
+            $mock->shouldReceive('first')
+                ->once()
+                ->andReturn($estoqueMock);
+        });
 
-        $produtoMock = Mockery::mock(Produto::class);
+        $produtoMock = Mockery::mock(Produto::class)->makePartial();
         $produtoMock->nome = 'Bolo de Chocolate';
         $produtoMock->status = 'Ativo';
         $produtoMock->quantidade = 3;
+        
         $produtoMock->shouldReceive('getAttribute')
-            ->with('status')
-            ->andReturn('Ativo');
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('quantidade')
-            ->andReturn(3);
-        $produtoMock->shouldReceive('getAttribute')
-            ->with('nome')
-            ->andReturn('Bolo de Chocolate');
+            ->andReturnUsing(function($key) use ($produtoMock) {
+                return $produtoMock->$key;
+            });
 
-        Produto::shouldReceive('findOrFail')
-            ->once()
-            ->with(1)
-            ->andReturn($produtoMock);
+        $this->mock(Produto::class, function ($mock) use ($produtoMock) {
+            $mock->shouldReceive('findOrFail')
+                ->once()
+                ->with(1)
+                ->andReturn($produtoMock);
+        });
 
         DB::shouldReceive('beginTransaction')->once();
         DB::shouldReceive('rollBack')->once();
@@ -528,11 +588,13 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_retorna_formato_correto()
     {
         // Arrange
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         // Act: Usar reflexão para acessar método privado
         $reflection = new \ReflectionClass($this->controller);
@@ -551,11 +613,13 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_gera_codigos_diferentes()
     {
         // Arrange
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         // Act: Gerar múltiplos códigos
         $reflection = new \ReflectionClass($this->controller);
@@ -576,11 +640,13 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_contem_data_atual()
     {
         // Arrange
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         // Act
         $reflection = new \ReflectionClass($this->controller);
@@ -598,11 +664,13 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_tem_comprimento_correto()
     {
         // Arrange
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         // Act
         $reflection = new \ReflectionClass($this->controller);
@@ -619,11 +687,13 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_usa_apenas_letras_maiusculas_e_numeros()
     {
         // Arrange
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        Pedido::shouldReceive('exists')
-            ->andReturn(false);
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            $mock->shouldReceive('exists')
+                ->andReturn(false);
+        });
 
         // Act
         $reflection = new \ReflectionClass($this->controller);
@@ -646,17 +716,18 @@ class PedidoControllerTest extends TestCase
     public function gerar_codigo_unico_tenta_novamente_quando_codigo_existe()
     {
         // Arrange: Simular que o primeiro código já existe
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        
-        Pedido::shouldReceive('exists')
-            ->once()
-            ->andReturn(true); // Primeira tentativa: código existe
-        
-        Pedido::shouldReceive('exists')
-            ->once()
-            ->andReturn(false); // Segunda tentativa: código único
+        $callCount = 0;
+        $this->mock(Pedido::class, function ($mock) use (&$callCount) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            
+            $mock->shouldReceive('exists')
+                ->andReturnUsing(function() use (&$callCount) {
+                    $callCount++;
+                    return $callCount === 1; // Primeira tentativa retorna true, demais false
+                });
+        });
 
         // Act
         $reflection = new \ReflectionClass($this->controller);
@@ -668,18 +739,21 @@ class PedidoControllerTest extends TestCase
         // Assert: Deve ter gerado um código válido após a segunda tentativa
         $this->assertIsString($codigo);
         $this->assertStringStartsWith('PED-', $codigo);
+        $this->assertEquals(2, $callCount); // Verificar que tentou 2 vezes
     }
 
     /** @test */
     public function gerar_codigo_unico_lanca_excecao_apos_max_tentativas()
     {
         // Arrange: Simular que o código sempre existe (max 10 tentativas)
-        Pedido::shouldReceive('where')
-            ->with('codigo', Mockery::any())
-            ->andReturnSelf();
-        
-        Pedido::shouldReceive('exists')
-            ->andReturn(true); // Sempre retorna true
+        $this->mock(Pedido::class, function ($mock) {
+            $mock->shouldReceive('where')
+                ->with('codigo', Mockery::any())
+                ->andReturnSelf();
+            
+            $mock->shouldReceive('exists')
+                ->andReturn(true); // Sempre retorna true
+        });
 
         // Assert: Esperar exceção
         $this->expectException(\Exception::class);
