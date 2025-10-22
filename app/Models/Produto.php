@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Produto extends Model
 {
+    use HasFactory;
+    protected $guarded = []; // opcional, ajuda nos testes
+
     use SoftDeletes; // não exclui do banco, apenas marca a data de exclusão
 
     protected $fillable = [

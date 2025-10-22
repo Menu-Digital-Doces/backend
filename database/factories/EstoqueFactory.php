@@ -8,28 +8,13 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 class EstoqueFactory extends Factory
 {
-    protected $model = Estoque::class;
+    protected $model = Estoque::class; // <- ADICIONE
 
-    public function definition(): array
+    public function definition()
     {
         return [
             'produto_id' => Produto::factory(),
-            'quantidade' => $this->faker->numberBetween(10, 100),
+            'quantidade' => 20,
         ];
     }
-
-    public function semEstoque(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'quantidade' => 0,
-        ]);
-    }
-
-    public function estoqueInsuficiente(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'quantidade' => $this->faker->numberBetween(1, 5),
-        ]);
-    }
 }
-

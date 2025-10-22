@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pagamento extends Model
 {
+    use HasFactory;
+
+    protected $guarded = [];
+    
     protected $fillable = [
         'pedido_id',
         'status',

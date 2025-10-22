@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\Auth;
 
 class PedidoController extends Controller
 {
+    public function testeCodigoUnico()
+    {
+        $codigo = 'PED-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
+        return response()->json(['codigo' => $codigo], 200);
+    }
+    
     public function index(Request $request)
     {
         // $pedidos = Pedido::with(['user', 'itens'])->get();

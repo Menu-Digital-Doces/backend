@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Produto;
+use App\Models\Estoque;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ProdutoFactory extends Factory
@@ -12,27 +13,20 @@ class ProdutoFactory extends Factory
     public function definition(): array
     {
         return [
-            'nome' => $this->faker->words(3, true),
-            'descricao' => $this->faker->sentence(),
-            'preco' => $this->faker->randomFloat(2, 10, 500),
-            'quantidade' => $this->faker->numberBetween(0, 100),
-            'imagem' => $this->faker->imageUrl(),
-            'status' => 'Ativo',
+            'nome'  => $this->faker->words(3, true),
+            'preco' => $this->faker->randomFloat(2, 10, 1000),
+            // REMOVIDO 'quantidade'
         ];
     }
 
-    public function inativo(): static
+    public function configure()
     {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'Inativo',
-        ]);
-    }
-
-    public function semEstoque(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'quantidade' => 0,
-        ]);
+        return $this->afterCreating(function (Produto $produto) {
+            // garante que todo produto tenha estoque vinculado
+            Estoque::factory()->create([
+                'produto_id' => $produto->id,
+                'quantidade' => 50, // ajuste se quiser
+            ]);
+        });
     }
 }
-

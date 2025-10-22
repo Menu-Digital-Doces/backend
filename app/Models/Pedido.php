@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Pedido extends Model
 {
+    use HasFactory;
+    protected $guarded = [];
+
     protected $fillable = [
         'codigo',
         'user_id',
@@ -28,5 +32,14 @@ class Pedido extends Model
     public function itens()
     {
         return $this->belongsTo(Produto::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Pedido $pedido) {
+            if (empty($pedido->codigo)) {
+                $pedido->codigo = 'PED-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
+            }
+        });
     }
 }

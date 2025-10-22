@@ -14,27 +14,10 @@ class PedidoFactory extends Factory
     public function definition(): array
     {
         return [
-            'codigo' => 'PED-' . date('Ymd') . '-' . strtoupper($this->faker->bothify('??????')),
-            'user_id' => User::factory(),
+            'user_id'    => User::factory(),
             'produto_id' => Produto::factory(),
-            'quantidade' => $this->faker->numberBetween(1, 10),
-            'total' => $this->faker->randomFloat(2, 10, 1000),
-            'status' => 'Pendente',
+            'quantidade' => $this->faker->numberBetween(1, 5),
+            'status'     => 'novo',
         ];
     }
-
-    public function confirmado(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'Confirmado',
-        ]);
-    }
-
-    public function cancelado(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'Cancelado',
-        ]);
-    }
 }
-

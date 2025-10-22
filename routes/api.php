@@ -19,6 +19,10 @@ use App\Http\Controllers\PagamentoController;
 |
 */
 
+if (app()->environment('testing')) {
+    Route::get('/teste-codigo-unico', [PedidoController::class, 'testeCodigoUnico']);
+}
+
 Route::post('register', [AuthController::class, 'register'])->name('register');
 Route::post('login', [AuthController::class, 'login'])->name('login');
 
