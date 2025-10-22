@@ -37,8 +37,13 @@ class Pedido extends Model
     protected static function booted(): void
     {
         static::creating(function (Pedido $pedido) {
+            if (empty($pedido->status)) {
+                $pedido->status = 'Pendente'    ;
+            }
+
+
             if (empty($pedido->codigo)) {
-                $pedido->codigo = 'PED-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
+                $pedido->codigo = 'PED-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
             }
         });
     }

@@ -16,47 +16,53 @@ class EstoqueController extends Controller
 
     public function store(Request $request)
     {
-        $validate = $request->validate([
+        $data = $request->validate([
             'produto_id' => 'required|exists:produtos,id',
             'quantidade' => 'required|integer|min:0',
         ]);
 
-        $produto = Produto::find($validate['produto_id']);
-        $estoque = Estoque::create($validate);
-        $produto->quantidade = $validate['quantidade'];
+        $estoque = Estoque::create($data);
 
-        return response()->json(['estoque' => $estoque, 'produto' => $produto], 201);
+        // Se quiser manter o campo 'quantidade' da tabela produtos sincronizado:
+        $produto = Produto::find($data['produto_id']);
+        if ($produto) {
+            $produto->update(['quantidade' => $data['quantidade']]);
+        }
+
+        // Seus testes não usam a resposta do store, mas mantive compatível
+        return response()->json(['estoque' => $estoque, 'produto' => $produto ?? null], 201);
     }
 
     public function show($id)
     {
         $estoque = Estoque::find($id);
-
-        return response()->json($estoque, 200);
-    }
-
-    function update(Request $request, $id)
-    {
-        $estoque = Estoque::where('produto_id', $id)->first();
         if (!$estoque) {
             return response()->json(['message' => 'Estoque não encontrado'], 404);
         }
 
-        $validate = $request->validate([
-            'quantidade' => 'sometimes|required|integer|min:0',
+        return response()->json($estoque, 200);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $estoque = Estoque::find($id);
+        if (!$estoque) {
+            return response()->json(['message' => 'Estoque não encontrado'], 404);
+        }
+
+        $data = $request->validate([
+            'quantidade' => 'required|integer|min:0',
         ]);
 
-        $incremento = [
-            'quantidade' => $validate['quantidade'] + $estoque->quantidade,
-        ];
-        $estoque->update($incremento);
+        // SET (não soma)
+        $estoque->update(['quantidade' => $data['quantidade']]);
 
         return response()->json($estoque, 200);
     }
 
     public function destroy($id)
     {
-        $estoque = Estoque::where('produto_id', $id)->first();
+        $estoque = Estoque::find($id);
         if (!$estoque) {
             return response()->json(['message' => 'Estoque não encontrado'], 404);
         }
@@ -64,5 +70,4 @@ class EstoqueController extends Controller
         $estoque->delete();
         return response()->json(['message' => 'Estoque deletado com sucesso'], 200);
     }
-
 }
