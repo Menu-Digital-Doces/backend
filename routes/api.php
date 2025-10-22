@@ -26,9 +26,9 @@ if (app()->environment('testing')) {
 Route::post('register', [AuthController::class, 'register'])->name('register');
 Route::post('login', [AuthController::class, 'login'])->name('login');
 
+$guard = app()->environment('testing') ? 'auth' : 'auth:api';
+Route::middleware($guard)->group(function () {
 
-
-Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('user', [AuthController::class, 'user'])->name('user');
 
@@ -50,7 +50,12 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('estoques/{id}', [EstoqueController::class, 'destroy']);
 
     Route::post('pedidos/{id}/pagamento', [PagamentoController::class, 'Pagar']);
-
-
-    // Route::apiResource('produtos', App\Http\Controllers\ProdutoController::class);
 });
+
+
+// Route::middleware('auth:api')->group(function () {
+
+
+
+//     // Route::apiResource('produtos', App\Http\Controllers\ProdutoController::class);
+// });

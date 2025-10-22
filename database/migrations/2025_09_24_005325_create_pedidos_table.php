@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('pedidos', function (Blueprint $table) {
             $table->id();
-            $table->integer('codigo')->unique();
+            $table->string('codigo')->unique();  // alterar para integer depois
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('produto_id')->constrained()->cascadeOnDelete();
             $table->decimal('total', 12, 2)->default(0);

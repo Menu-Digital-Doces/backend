@@ -17,7 +17,7 @@ class PedidoFactory extends Factory
             'user_id'    => User::factory(),
             'produto_id' => Produto::factory(),
             'quantidade' => $this->faker->numberBetween(1, 5),
-            'status'     => 'novo',
+            'status'     => 'Pendente',
         ];
     }
 }

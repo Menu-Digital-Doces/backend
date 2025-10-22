@@ -18,7 +18,7 @@ class PedidoController extends Controller
         $codigo = 'PED-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
         return response()->json(['codigo' => $codigo], 200);
     }
-    
+
     public function index(Request $request)
     {
         // $pedidos = Pedido::with(['user', 'itens'])->get();
@@ -35,83 +35,85 @@ class PedidoController extends Controller
 
     public function store(Request $request)
     {
-        $user_id = Auth::id();
+        $userId = $request->user()->id;
 
-        $validated = $request->validate([
-            'itens' => 'required|array|min:1',
-            'itens.*.produto_id' => 'required|exists:produtos,id',
-            'itens.*.quantidade' => 'required|integer|min:1',
+        $data = $request->validate([
+            'itens' => ['required', 'array', 'min:1'],
+            'itens.*.produto_id' => ['required', 'exists:produtos,id'],
+            'itens.*.quantidade' => ['required', 'integer', 'min:1'],
         ]);
 
-        // Gerar código único
-        $codigo = $this->gerarCodigoUnico();
-        $pedidosCriados = [];
-
-        // Usar transação para garantir atomicidade
-        DB::beginTransaction();
+        $codigo = 'PED-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
 
         try {
+            $payload = DB::transaction(function () use ($data, $userId, $codigo) {
+                $itens = [];
+                $totalGeral = 0;
 
-            foreach ($validated['itens'] as $item) {
-                $estoque = Estoque::where('produto_id', $item['produto_id'])->first();
-                if (!$estoque) {
-                    throw new \Exception("Estoque não encontrado para o produto.");
+                foreach ($data['itens'] as $item) {
+                    $produto = Produto::lockForUpdate()->find($item['produto_id']);
+
+                    if ($produto->status !== 'Ativo') {
+                        throw new \DomainException('Produto não está Ativo');
+                    }
+
+                    // $estoque = Estoque::where('produto_id', $produto->id)->lockForUpdate()->first();
+                    $estoque = Estoque::where('produto_id', $produto->id)
+                        ->lockForUpdate()
+                        ->orderByDesc('id')
+                        ->first();
+
+
+                    if (!$estoque || $estoque->quantidade < $item['quantidade']) {
+                        throw new \DomainException('Quantidade solicitada maior que estoque disponível');
+                    }
+
+                    // baixa de estoque
+                    $estoque->decrement('quantidade', (int)$item['quantidade']);
+
+                    // cria o pedido (um por item) com o mesmo código)
+                    $subtotal = (float)$produto->preco * (int)$item['quantidade'];
+                    Pedido::create([
+                        'codigo'      => $codigo,
+                        'user_id'     => $userId,
+                        'produto_id'  => $produto->id,
+                        'quantidade'  => (int)$item['quantidade'],
+                        'total'       => $subtotal,
+                        'status'      => 'Pendente',
+                    ]);
+
+                    $itens[] = [
+                        'produto_id' => $produto->id,
+                        'quantidade' => (int)$item['quantidade'],
+                        'preco'      => (float)$produto->preco,
+                        'subtotal'   => $subtotal,
+                    ];
+                    $totalGeral += $subtotal;
                 }
 
-                if ($estoque->quantidade < $item['quantidade']) {
-                    throw new \Exception("Estoque insuficiente para o produto.");
-                }
-
-                $produto = Produto::findOrFail($item['produto_id']);
-
-                // Verificar se produto está ativo
-                if ($produto->status !== 'Ativo') {
-                    throw new \Exception("Produto '{$produto->nome}' não está disponível.");
-                }
-
-                // Verificar estoque
-                if ($produto->quantidade < $item['quantidade']) {
-                    throw new \Exception("Estoque insuficiente para '{$produto->nome}'.");
-                }
-
-                // Criar pedido
-                $pedido = Pedido::create([
-                    'codigo' => $codigo,
-                    'user_id' => $user_id,
-                    'produto_id' => $item['produto_id'],
-                    'quantidade' => $item['quantidade'],
-                    'total' => $produto->preco * $item['quantidade'],
-                    'status' => 'Pendente',
-                ]);
-
-                // Atualizar estoque
-                $produto->decrement('quantidade', $item['quantidade']);
-
-                $pedidosCriados[] = $pedido;
-
-                $estoqueInformacao = [
-                    'quantidade' => $estoque->quantidade - $pedido->quantidade,
+                // o que o closure retorna vai ser o valor do DB::transaction(...)
+                return [
+                    'message'     => 'Pedido criado com sucesso',
+                    'codigo'      => $codigo,
+                    'itens'       => $itens,
+                    'total_geral' => $totalGeral,
                 ];
+            });
 
-                $estoque->update($estoqueInformacao);
-            }
-
-
-
-            DB::commit();
-
+            // sucesso: COMMIT já feito, devolve 201
+            return response()->json($payload, 201);
+        } catch (\DomainException $e) {
+            // erro de negócio: ROLLBACK automático pela transação
             return response()->json([
-                'message' => 'Pedido criado com sucesso',
-                'codigo' => $codigo,
-                'itens' => $pedidosCriados,
-                'total_geral' => array_sum(array_map(fn($p) => $p->total, $pedidosCriados))
-            ], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Erro ao criar pedido',
-                'error' => $e->getMessage()
+                'message' => 'Estoque/Produto indisponível',
+                'error'   => $e->getMessage(),
             ], 400);
+        } catch (\Throwable $e) {
+            // erro inesperado
+            report($e);
+            return response()->json([
+                'message' => 'Erro interno',
+            ], 500);
         }
     }
 
