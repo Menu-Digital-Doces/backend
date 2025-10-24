@@ -71,6 +71,13 @@ class ProdutoController extends Controller
         if (!$produto) {
             return response()->json(['message' => 'Produto não encontrado'], 404);
         }
+        $estoque = Estoque::where('produto_id', $produto->id)->first();
+        if ($estoque && $estoque->quantidade > 0) {
+            return response()->json(['message' => 'Não é possível deletar o produto com estoque disponível'], 400);
+        }
+
+        $estoque->delete();
+
         $produto->delete();
         return response()->json(['message' => 'Produto deletado com sucesso'], 200);
     }

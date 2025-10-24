@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Pagamento;
 use App\Models\Pedido;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class PagamentoController extends Controller
 {
@@ -33,6 +34,28 @@ class PagamentoController extends Controller
             'nome_titular' => $request->nome_titular,
             'validade' => $request->validade,
             'cvv' => $request->cvv,
+        ]);
+
+        $pedido->update(['status' => $status == 'aprovado' ? 'Confirmado' : 'Cancelado']);
+
+        $informacao_Status = $status == 'aprovado' ? 'Pagamento aprovado!' : 'Pagamento recusado!';
+
+        return response()->json(['message' => 'Pagamento realizado!', 'status' => $informacao_Status]);
+    }
+
+    public function pagarPix(Request $request, $codigo)
+    {
+        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+
+        $totalPedido = $pedido->itens()->sum(DB::raw('preco * quantidade'));
+
+        $status = rand(1, 100) <= 80 ? 'aprovado' : 'recusado';
+
+        $pagamento = Pagamento::create([
+            'pedido_id' => $pedido->id,
+            'status' => 'aprovado',
+            'metodo' => 'pix',
+            'valor' => $totalPedido,
         ]);
 
         $pedido->update(['status' => $status == 'aprovado' ? 'Confirmado' : 'Cancelado']);
