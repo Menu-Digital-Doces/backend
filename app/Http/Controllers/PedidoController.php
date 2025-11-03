@@ -21,14 +21,19 @@ class PedidoController extends Controller
 
     public function index(Request $request)
     {
-        // $pedidos = Pedido::with(['user', 'itens'])->get();
-        $user = Auth::id();
-        $pedidos = DB::table('pedidos')
+        $user = Auth::user();
+
+        $query = DB::table('pedidos')
             ->join('users', 'pedidos.user_id', '=', 'users.id')
             ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
-            ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id')
-            ->where('users.id', $user)
-            ->get();
+            ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id');
+
+        // Se não for admin (tipo != 1), filtra apenas pedidos do próprio usuário
+        if ($user->tipo != 1) {
+            $query->where('users.id', $user->id);
+        }
+
+        $pedidos = $query->get();
 
         return response()->json($pedidos, 200);
     }
@@ -139,14 +144,25 @@ class PedidoController extends Controller
 
     public function show($id)
     {
-        $pedidos = DB::table('pedidos')
+        $user = Auth::user();
+
+        $query = DB::table('pedidos')
             ->join('users', 'pedidos.user_id', '=', 'users.id')
             ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
             ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id')
-            ->where('pedidos.id', $id)
-            ->first();
+            ->where('pedidos.id', $id);
 
-        return response()->json($pedidos, 200);
+        // Se não for admin, filtra apenas pedidos do próprio usuário
+        if ($user->tipo != 1) {
+            $query->where('users.id', $user->id);
+        }
+        $pedido = $query->first();
+
+        if (!$pedido) {
+            return response()->json(['message' => 'Pedido não encontrado'], 404);
+        }
+        
+        return response()->json($pedido, 200);
     }
 
     public function update(Request $request, $id)
