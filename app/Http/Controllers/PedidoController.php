@@ -10,7 +10,6 @@ use Illuminate\Support\Str;
 use App\Models\Estoque;
 use Illuminate\Support\Facades\Auth;
 
-
 class PedidoController extends Controller
 {
     public function testeCodigoUnico()
@@ -19,24 +18,24 @@ class PedidoController extends Controller
         return response()->json(['codigo' => $codigo], 200);
     }
 
-public function index(Request $request)
-{
-    $user = Auth::user();
+    public function index(Request $request)
+    {
+        $user = Auth::user();
 
-    $query = DB::table('pedidos')
-        ->join('users', 'pedidos.user_id', '=', 'users.id')
-        ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
-        ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id');
+        $query = DB::table('pedidos')
+            ->join('users', 'pedidos.user_id', '=', 'users.id')
+            ->join('produtos', 'pedidos.produto_id', '=', 'produtos.id')
+            ->select('pedidos.*', 'users.name as user_name', 'users.email as user_email', 'users.id as user_id');
 
-    // Se não for admin (tipo != 1), filtra apenas pedidos do próprio usuário
-    if ($user->tipo != 1) {
-        $query->where('users.id', $user->id);
+        // Se não for admin (tipo != 1), filtra apenas pedidos do próprio usuário
+        if ($user->tipo != 1) {
+            $query->where('users.id', $user->id);
+        }
+
+        $pedidos = $query->get();
+
+        return response()->json($pedidos, 200);
     }
-
-    $pedidos = $query->get();
-
-    return response()->json($pedidos, 200);
-}
 
     public function store(Request $request)
     {
@@ -62,21 +61,23 @@ public function index(Request $request)
                         throw new \DomainException('Produto não está Ativo');
                     }
 
-                    // $estoque = Estoque::where('produto_id', $produto->id)->lockForUpdate()->first();
-                    $estoque = Estoque::where('produto_id', $produto->id)
-                        ->lockForUpdate()
-                        ->orderByDesc('id')
-                        ->first();
+                    // Usa a relação one-to-one para buscar o estoque
+                    $estoque = $produto->estoque()->lockForUpdate()->first();
 
+                    // Verifica se o produto tem estoque cadastrado
+                    if (!$estoque) {
+                        throw new \DomainException('Produto sem estoque cadastrado');
+                    }
 
-                    if (!$estoque || $estoque->quantidade < $item['quantidade']) {
+                    // Verifica se há quantidade suficiente
+                    if ($estoque->quantidade < $item['quantidade']) {
                         throw new \DomainException('Quantidade solicitada maior que estoque disponível');
                     }
 
-                    // baixa de estoque
+                    // Baixa de estoque
                     $estoque->decrement('quantidade', (int)$item['quantidade']);
 
-                    // cria o pedido (um por item) com o mesmo código)
+                    // Cria o pedido (um por item) com o mesmo código
                     $subtotal = (float)$produto->preco * (int)$item['quantidade'];
                     Pedido::create([
                         'codigo'      => $codigo,
@@ -96,7 +97,6 @@ public function index(Request $request)
                     $totalGeral += $subtotal;
                 }
 
-                // o que o closure retorna vai ser o valor do DB::transaction(...)
                 return [
                     'message'     => 'Pedido criado com sucesso',
                     'codigo'      => $codigo,
@@ -105,16 +105,13 @@ public function index(Request $request)
                 ];
             });
 
-            // sucesso: COMMIT já feito, devolve 201
             return response()->json($payload, 201);
         } catch (\DomainException $e) {
-            // erro de negócio: ROLLBACK automático pela transação
             return response()->json([
                 'message' => 'Estoque/Produto indisponível',
                 'error'   => $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
-            // erro inesperado
             report($e);
             return response()->json([
                 'message' => 'Erro interno',
@@ -139,8 +136,6 @@ public function index(Request $request)
 
         return $codigo;
     }
-
-
 
     public function show($id)
     {

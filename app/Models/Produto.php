@@ -17,7 +17,7 @@ class Produto extends Model
         'nome',
         'descricao',
         'preco',
-        'quantidade',
+        // 'quantidade',
         'imagem',
         'status',
     ];
@@ -25,4 +25,9 @@ class Produto extends Model
     protected $casts = [
         'preco' => 'decimal:2',
     ];
+
+    public function estoque()
+    {
+        return $this->hasOne(Estoque::class);
+    }
 }

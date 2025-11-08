@@ -12,7 +12,12 @@ class Estoque extends Model
     protected $guarded = [];
     
     protected $fillable = [
-        'produto_id',
+        // 'produto_id',
         'quantidade',
     ];
+
+    public function produto()
+    {
+        return $this->belongsTo(Produto::class);
+    }
 }

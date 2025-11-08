@@ -10,32 +10,41 @@ class EstoqueController extends Controller
 {
     public function index()
     {
-        $estoques = Estoque::all();
+        // Retorna todos os estoques com seus produtos
+        $estoques = Estoque::with('produto')->get();
         return response()->json($estoques, 200);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'produto_id' => 'required|exists:produtos,id',
+            'produto_id' => 'required|exists:produtos,id|unique:estoques,produto_id',
             'quantidade' => 'required|integer|min:0',
         ]);
 
-        $estoque = Estoque::create($data);
-
-        // Se quiser manter o campo 'quantidade' da tabela produtos sincronizado:
-        $produto = Produto::find($data['produto_id']);
-        if ($produto) {
-            $produto->update(['quantidade' => $data['quantidade']]);
+        // Verifica se o produto já tem estoque (one-to-one)
+        $produtoComEstoque = Produto::with('estoque')->find($data['produto_id']);
+        
+        if ($produtoComEstoque && $produtoComEstoque->estoque) {
+            return response()->json([
+                'message' => 'Este produto já possui um estoque cadastrado'
+            ], 422);
         }
 
-        // Seus testes não usam a resposta do store, mas mantive compatível
-        return response()->json(['estoque' => $estoque, 'produto' => $produto ?? null], 201);
+        // Cria o estoque
+        $estoque = Estoque::create($data);
+
+        // Carrega a relação com o produto
+        $estoque->load('produto');
+
+        return response()->json($estoque, 201);
     }
 
     public function show($id)
     {
-        $estoque = Estoque::find($id);
+        // Busca estoque com produto relacionado
+        $estoque = Estoque::with('produto')->find($id);
+        
         if (!$estoque) {
             return response()->json(['message' => 'Estoque não encontrado'], 404);
         }
@@ -45,7 +54,8 @@ class EstoqueController extends Controller
 
     public function update(Request $request, $id)
     {
-        $estoque = Estoque::find($id);
+        $estoque = Estoque::with('produto')->find($id);
+        
         if (!$estoque) {
             return response()->json(['message' => 'Estoque não encontrado'], 404);
         }
@@ -54,20 +64,50 @@ class EstoqueController extends Controller
             'quantidade' => 'required|integer|min:0',
         ]);
 
-        // SET (não soma)
+        // Atualiza a quantidade do estoque
         $estoque->update(['quantidade' => $data['quantidade']]);
+
+        // Recarrega a relação
+        $estoque->load('produto');
 
         return response()->json($estoque, 200);
     }
 
     public function destroy($id)
     {
-        $estoque = Estoque::find($id);
+        $estoque = Estoque::with('produto')->find($id);
+        
         if (!$estoque) {
             return response()->json(['message' => 'Estoque não encontrado'], 404);
         }
 
+        // Verifica se há quantidade antes de deletar (opcional)
+        if ($estoque->quantidade > 0) {
+            return response()->json([
+                'message' => 'Não é possível deletar estoque com quantidade disponível'
+            ], 400);
+        }
+
         $estoque->delete();
-        return response()->json(['message' => 'Estoque deletado com sucesso'], 200);
+        
+        return response()->json([
+            'message' => 'Estoque deletado com sucesso'
+        ], 200);
+    }
+
+    // Método adicional: buscar estoque por produto_id
+    public function getByProduto($produto_id)
+    {
+        $produto = Produto::with('estoque')->find($produto_id);
+        
+        if (!$produto) {
+            return response()->json(['message' => 'Produto não encontrado'], 404);
+        }
+
+        if (!$produto->estoque) {
+            return response()->json(['message' => 'Este produto não possui estoque'], 404);
+        }
+
+        return response()->json($produto->estoque, 200);
     }
 }
