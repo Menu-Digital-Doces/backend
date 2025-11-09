@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.vscode
+vendor/
+node_modules/
+storage/*.log
+storage/debugbar/
+storage/logs/*.log
+public/hot
+.DS_Store
+npm-debug.log
+yarn-error.log
