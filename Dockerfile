@@ -45,7 +45,7 @@ RUN cp .env.example .env || true
 RUN php artisan key:generate
 
 # Execute as otimizações do Laravel para produção
-RUN php artisan config:cache
+# RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:cache
 
